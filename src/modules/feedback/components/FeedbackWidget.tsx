@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ElementPicker } from "./ElementPicker";
 import { AnnotationForm } from "./AnnotationForm";
 
 interface FeedbackWidgetProps {
   projectSlug: string;
   sessionId: string;
+  /** If set, element picking also attaches to the same-origin iframe's document */
+  iframeSrc?: string;
 }
 
 type WidgetState =
@@ -21,26 +23,44 @@ type WidgetState =
  *
  * Wrap with dynamic() + { ssr: false } at the call site.
  */
-export function FeedbackWidget({ projectSlug, sessionId }: FeedbackWidgetProps) {
+export function FeedbackWidget({
+  projectSlug,
+  sessionId,
+  iframeSrc,
+}: FeedbackWidgetProps) {
   const [state, setState] = useState<WidgetState>({ mode: "idle" });
   const [feedbackCount, setFeedbackCount] = useState(0);
+  const [iframeEl, setIframeEl] = useState<HTMLIFrameElement | null>(null);
+
+  // Locate the iframe in the DOM once it has loaded
+  useEffect(() => {
+    if (!iframeSrc) return;
+    const find = () => {
+      const el = document.querySelector<HTMLIFrameElement>(
+        `iframe[src="${iframeSrc}"]`
+      );
+      if (el) setIframeEl(el);
+    };
+    find();
+    // Retry after a short delay in case the iframe isn't mounted yet
+    const t = setTimeout(find, 500);
+    return () => clearTimeout(t);
+  }, [iframeSrc]);
 
   const handleElementSelected = useCallback(
-    async (selector: string, element: Element) => {
-      // Take screenshot of the current viewport via html2canvas
+    async (selector: string, _element: Element) => {
       let screenshot: string | null = null;
       try {
         const html2canvas = (await import("html2canvas")).default;
         const canvas = await html2canvas(document.body, {
           useCORS: true,
           allowTaint: false,
-          scale: 0.5, // reduce size
+          scale: 0.5,
         });
         screenshot = canvas.toDataURL("image/png");
       } catch {
-        // Screenshot is optional — proceed without it
+        // Screenshot is optional
       }
-
       setState({ mode: "annotating", selector, screenshot });
     },
     []
@@ -98,21 +118,24 @@ export function FeedbackWidget({ projectSlug, sessionId }: FeedbackWidgetProps) 
           }
           className={`flex items-center gap-2 text-sm font-medium px-4 py-3 rounded-full shadow-lg transition-colors ${
             state.mode === "picking"
-              ? "bg-blue-700 text-white"
+              ? "bg-blue-700 text-white ring-2 ring-blue-300"
               : "bg-blue-600 hover:bg-blue-700 text-white"
           }`}
         >
-          <span>{state.mode === "picking" ? "Abbrechen" : "Feedback geben"}</span>
+          <span>
+            {state.mode === "picking" ? "Abbrechen" : "Feedback geben"}
+          </span>
           <span className="text-lg leading-none">
             {state.mode === "picking" ? "✕" : "💬"}
           </span>
         </button>
       </div>
 
-      {/* Element picker overlay */}
+      {/* Element picker — works on host page and same-origin iframe */}
       <ElementPicker
         active={state.mode === "picking"}
         onSelect={handleElementSelected}
+        iframeEl={iframeEl}
       />
 
       {/* Annotation dialog */}

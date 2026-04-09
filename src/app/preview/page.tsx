@@ -1,4 +1,6 @@
 import { redirect } from "next/navigation";
+import { existsSync } from "fs";
+import path from "path";
 import dynamic from "next/dynamic";
 import { verifyPreviewToken } from "@/lib/preview-token";
 
@@ -12,7 +14,18 @@ const FeedbackWidget = dynamic(
 );
 
 interface Props {
-  searchParams: { token?: string; slug?: string };
+  searchParams: { token?: string };
+}
+
+function hasStaticPreview(slug: string): boolean {
+  const previewPath = path.join(
+    process.cwd(),
+    "public",
+    "previews",
+    slug,
+    "index.html"
+  );
+  return existsSync(previewPath);
 }
 
 export default function PreviewPage({ searchParams }: Props) {
@@ -41,39 +54,59 @@ export default function PreviewPage({ searchParams }: Props) {
   }
 
   const { slug, sessionId } = verified;
+  const staticPreviewAvailable = hasStaticPreview(slug);
+  const iframeSrc = staticPreviewAvailable
+    ? `/previews/${slug}/index.html`
+    : null;
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      {/* Preview header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+    <div className="flex flex-col h-screen overflow-hidden">
+      {/* Slim header bar */}
+      <header className="bg-white border-b border-gray-200 px-5 py-2.5 flex items-center justify-between flex-shrink-0 z-10">
+        <div className="flex items-center gap-2.5">
           <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
           <span className="text-sm text-gray-600">
-            Preview:{" "}
-            <span className="font-medium text-gray-800">{slug}</span>
+            Vorschau:{" "}
+            <span className="font-semibold text-gray-900">{slug}</span>
           </span>
         </div>
-        <p className="text-xs text-gray-400">
-          Klicke auf ein Element, um Feedback zu geben
+        <p className="text-xs text-gray-400 hidden sm:block">
+          💬 Element anklicken → Feedback hinterlassen
         </p>
+      </header>
+
+      {/* Preview area */}
+      <div className="flex-1 relative overflow-hidden">
+        {iframeSrc ? (
+          // Same-origin iframe — widget can screenshot across it
+          <iframe
+            src={iframeSrc}
+            className="w-full h-full border-0"
+            title={`Preview: ${slug}`}
+            // same-origin so no sandbox needed; html2canvas can capture it
+          />
+        ) : (
+          // Fallback: no static preview available
+          <div className="flex items-center justify-center h-full bg-gray-50">
+            <div className="max-w-lg mx-auto bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
+              <h1 className="text-xl font-semibold text-gray-800 mb-3">
+                Vorschau — {slug}
+              </h1>
+              <p className="text-gray-500 text-sm">
+                Nutze das Feedback-Widget unten rechts, um Änderungswünsche
+                zu hinterlassen.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Preview content area */}
-      <div className="p-8">
-        <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-sm border border-gray-200 p-8">
-          <h1 className="text-2xl font-semibold text-gray-800 mb-4">
-            Vorschau — {slug}
-          </h1>
-          <p className="text-gray-500">
-            Hier siehst du die aktuelle Vorschau deines Projekts. Nutze das
-            Feedback-Widget unten rechts, um Änderungswünsche direkt auf der
-            Seite zu markieren.
-          </p>
-        </div>
-      </div>
-
-      {/* Feedback widget (client-side only) */}
-      <FeedbackWidget projectSlug={slug} sessionId={sessionId} />
-    </main>
+      {/* Feedback widget — floats above everything incl. iframe */}
+      <FeedbackWidget
+        projectSlug={slug}
+        sessionId={sessionId}
+        iframeSrc={iframeSrc ?? undefined}
+      />
+    </div>
   );
 }
