@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { timingSafeEqual } from "crypto";
 import { FeedbackDashboard } from "@/modules/feedback/admin/FeedbackDashboard";
+import { FeedbackCharts } from "@/modules/feedback/admin/FeedbackCharts";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -39,6 +40,7 @@ export default function AdminFeedbackPage() {
         </form>
       </header>
       <main className="max-w-5xl mx-auto px-6 py-8">
+        <FeedbackCharts />
         <div className="mb-6">
           <h2 className="text-xl font-semibold text-gray-900">
             Alle Feedbacks
