@@ -2,6 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { verifyPreviewToken } from "@/lib/preview-token";
 
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, x-preview-token",
+};
+
+export function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
+}
+
 // ── POST /api/feedback/confirm ── Guest-Token auth ────────────────────────────
 // Marks all feedback for this session as confirmed (customer is done).
 export async function POST(req: NextRequest) {
@@ -9,14 +19,14 @@ export async function POST(req: NextRequest) {
     req.nextUrl.searchParams.get("token");
 
   if (!token) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: CORS_HEADERS });
   }
 
   let verified: { slug: string; sessionId: string };
   try {
     verified = verifyPreviewToken(token);
   } catch {
-    return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
+    return NextResponse.json({ error: "Invalid or expired token" }, { status: 401, headers: CORS_HEADERS });
   }
 
   let body: { project_slug?: string; session_id?: string } = {};
@@ -31,7 +41,7 @@ export async function POST(req: NextRequest) {
 
   // Validate that token slug matches requested slug (prevent cross-project confirmation)
   if (project_slug !== verified.slug) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403, headers: CORS_HEADERS });
   }
 
   const { rowCount } = await pool.query(
@@ -43,5 +53,5 @@ export async function POST(req: NextRequest) {
     [project_slug, session_id]
   );
 
-  return NextResponse.json({ confirmed: rowCount ?? 0 });
+  return NextResponse.json({ confirmed: rowCount ?? 0 }, { headers: CORS_HEADERS });
 }

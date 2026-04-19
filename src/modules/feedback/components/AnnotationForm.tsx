@@ -8,6 +8,7 @@ interface AnnotationFormProps {
   selector: string;
   sessionId: string;
   projectSlug: string;
+  token: string;
   pageUrl: string;
   screenshotBase64: string | null;
   onSubmitted: () => void;
@@ -19,6 +20,7 @@ export function AnnotationForm({
   selector,
   sessionId,
   projectSlug,
+  token,
   pageUrl,
   screenshotBase64,
   onSubmitted,
@@ -37,7 +39,10 @@ export function AnnotationForm({
     try {
       const res = await fetch("/api/feedback", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-preview-token": token,
+        },
         body: JSON.stringify({
           project_slug: projectSlug,
           session_id: sessionId,

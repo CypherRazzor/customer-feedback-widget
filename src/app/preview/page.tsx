@@ -105,6 +105,7 @@ export default function PreviewPage({ searchParams }: Props) {
       <FeedbackWidget
         projectSlug={slug}
         sessionId={sessionId}
+        token={token}
         iframeSrc={iframeSrc ?? undefined}
       />
     </div>

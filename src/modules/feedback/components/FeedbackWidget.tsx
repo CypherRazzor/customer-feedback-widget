@@ -7,6 +7,8 @@ import { AnnotationForm } from "./AnnotationForm";
 interface FeedbackWidgetProps {
   projectSlug: string;
   sessionId: string;
+  /** Preview token sent with API requests */
+  token: string;
   /** If set, element picking also attaches to the same-origin iframe's document */
   iframeSrc?: string;
 }
@@ -26,6 +28,7 @@ type WidgetState =
 export function FeedbackWidget({
   projectSlug,
   sessionId,
+  token,
   iframeSrc,
 }: FeedbackWidgetProps) {
   const [state, setState] = useState<WidgetState>({ mode: "idle" });
@@ -74,11 +77,14 @@ export function FeedbackWidget({
   const handleConfirm = useCallback(async () => {
     await fetch("/api/feedback/confirm", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-preview-token": token,
+      },
       body: JSON.stringify({ project_slug: projectSlug, session_id: sessionId }),
     });
     setState({ mode: "confirmed" });
-  }, [projectSlug, sessionId]);
+  }, [projectSlug, sessionId, token]);
 
   if (state.mode === "confirmed") {
     return (
@@ -147,6 +153,7 @@ export function FeedbackWidget({
         }
         sessionId={sessionId}
         projectSlug={projectSlug}
+        token={token}
         pageUrl={typeof window !== "undefined" ? window.location.href : ""}
         onSubmitted={handleSubmitted}
         onCancel={() => setState({ mode: "idle" })}
