@@ -12,6 +12,7 @@
  *   data-api      Base URL of the feedback API (defaults to same origin as the script)
  *   data-project  Project slug override (normally derived from the token)
  *   data-session  Session ID override (auto-generated if absent)
+ *   data-demo     Set to "true" to run in demo mode (no API calls, simulates success)
  */
 (function () {
   "use strict";
@@ -32,8 +33,9 @@
   var SESSION_ID =
     (currentScript && currentScript.dataset.session) ||
     "s-" + Math.random().toString(36).slice(2);
+  var DEMO_MODE = (currentScript && currentScript.dataset.demo) === "true";
 
-  if (!TOKEN) {
+  if (!TOKEN && !DEMO_MODE) {
     console.warn("[FeedbackWidget] Missing data-token attribute.");
     return;
   }
@@ -305,6 +307,15 @@
       submitBtn.textContent = "Wird gesendet\u2026";
       errEl.style.display = "none";
 
+      if (DEMO_MODE) {
+        setTimeout(function () {
+          feedbackCount++;
+          closeForm();
+          renderToolbar();
+        }, 600);
+        return;
+      }
+
       fetch(API_BASE + "/api/feedback", {
         method: "POST",
         headers: {
@@ -369,6 +380,17 @@
 
   // ── Confirm session ──────────────────────────────────────────────────────────
   function confirmSession() {
+    if (DEMO_MODE) {
+      if (toolbarEl) { toolbarEl.remove(); toolbarEl = null; }
+      var doneEl = document.createElement("div");
+      doneEl.className = "_fb-done";
+      doneEl.setAttribute("data-feedback-ui", "");
+      doneEl.innerHTML =
+        "<p>Feedback abgeschlossen \u2713</p>" +
+        "<span>Vielen Dank! (Demo-Modus)</span>";
+      document.body.appendChild(doneEl);
+      return;
+    }
     fetch(API_BASE + "/api/feedback/confirm", {
       method: "POST",
       headers: {
