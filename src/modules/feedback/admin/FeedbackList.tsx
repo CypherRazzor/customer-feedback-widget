@@ -134,10 +134,8 @@ function FeedbackCard({ item }: { item: FeedbackItem }) {
   const patch = async (body: Record<string, string>) => {
     await fetch(`/api/feedback/${item.id}`, {
       method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${document.cookie.match(/admin_session=([^;]+)/)?.[1] ?? ""}`,
-      },
+      headers: { "Content-Type": "application/json" },
+      // admin_session is httpOnly — browser sends it automatically on same-origin requests
       body: JSON.stringify(body),
     });
   };

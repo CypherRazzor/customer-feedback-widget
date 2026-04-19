@@ -78,6 +78,23 @@ export async function PATCH(
 function isAdminAuthorized(req: NextRequest): boolean {
   const adminSecret = process.env.ADMIN_SECRET;
   if (!adminSecret) return false;
+
+  // Accept Bearer token (server-to-server / curl)
   const auth = req.headers.get("authorization");
-  return auth === `Bearer ${adminSecret}`;
+  if (auth === `Bearer ${adminSecret}`) return true;
+
+  // Accept httpOnly admin_session cookie (browser same-origin requests)
+  try {
+    const { timingSafeEqual } = require("crypto") as typeof import("crypto");
+    const sessionValue = req.cookies.get("admin_session")?.value ?? "";
+    if (sessionValue.length === adminSecret.length) {
+      return timingSafeEqual(
+        Buffer.from(sessionValue),
+        Buffer.from(adminSecret)
+      );
+    }
+  } catch {
+    // buffer length mismatch or missing cookie
+  }
+  return false;
 }
