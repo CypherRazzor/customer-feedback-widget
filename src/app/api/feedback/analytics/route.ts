@@ -25,7 +25,7 @@ async function fetchTimeSeries(days: number) {
        TO_CHAR(DATE_TRUNC('day', created_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD') AS date,
        COUNT(*)::text AS count
      FROM feedback_annotations
-     WHERE created_at >= NOW() - ($1 || ' days')::INTERVAL
+     WHERE created_at >= NOW() - ($1 * INTERVAL '1 day')
      GROUP BY DATE_TRUNC('day', created_at AT TIME ZONE 'UTC')
      ORDER BY DATE_TRUNC('day', created_at AT TIME ZONE 'UTC') ASC`,
     [days]
@@ -56,7 +56,7 @@ async function fetchStatusBreakdown(days: number) {
        END AS name,
        COUNT(*)::text AS value
      FROM feedback_annotations
-     WHERE created_at >= NOW() - ($1 || ' days')::INTERVAL
+     WHERE created_at >= NOW() - ($1 * INTERVAL '1 day')
      GROUP BY 1`,
     [days]
   );
@@ -75,9 +75,12 @@ function isAdminAuthorized(req: NextRequest): boolean {
   // Accept httpOnly session cookie (for browser requests from the admin UI)
   const session = req.cookies.get("admin_session")?.value ?? "";
   try {
+    const sessionBuf = Buffer.from(session);
+    const secretBuf = Buffer.from(adminSecret);
     return (
       session.length > 0 &&
-      timingSafeEqual(Buffer.from(session), Buffer.from(adminSecret))
+      sessionBuf.length === secretBuf.length &&
+      timingSafeEqual(sessionBuf, secretBuf)
     );
   } catch {
     return false;
