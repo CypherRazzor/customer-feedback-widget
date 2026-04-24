@@ -32,8 +32,7 @@ git clone https://github.com/CypherRazzor/customer-feedback-widget.git
 cd customer-feedback-widget
 npm install
 cp .env.example .env.local   # fill in your environment variables
-psql $DATABASE_URL -f migrations/001_initial.sql
-psql $DATABASE_URL -f migrations/002_add_status.sql
+psql $DATABASE_URL -f migrations/20260407000000_feedback_annotations.sql
 npm run build
 npm start
 ```
@@ -45,31 +44,34 @@ The server exposes:
 
 ### Environment Variables
 
-Create a `.env.local` file in the project root:
+Copy `.env.example` to `.env.local` and fill in your values:
 
 ```env
 # PostgreSQL connection string
-DATABASE_URL=postgres://user:password@localhost:5432/feedback
+DATABASE_URL=postgresql://user:password@host:5432/dbname
 
-# AWS S3 for screenshot storage
-AWS_REGION=eu-central-1
-AWS_BUCKET_NAME=feedback-screenshots
-AWS_ACCESS_KEY_ID=...
-AWS_SECRET_ACCESS_KEY=...
+# Hetzner Object Storage (S3-compatible)
+HETZNER_S3_ENDPOINT=https://fsn1.your-objectstorage.com
+HETZNER_S3_REGION=eu-central-1
+HETZNER_S3_BUCKET=feedback-screenshots
+HETZNER_S3_ACCESS_KEY=your-access-key
+HETZNER_S3_SECRET_KEY=your-secret-key
+HETZNER_S3_PUBLIC_URL=https://feedback-screenshots.fsn1.your-objectstorage.com
 
-# JWT secret for preview token signing
-PREVIEW_TOKEN_SECRET=change-me-in-production
+# HMAC secret for preview token signing
+PREVIEW_TOKEN_SECRET=change-me-random-32chars
 
-# Auth (better-auth)
-BETTER_AUTH_SECRET=change-me-in-production
-BETTER_AUTH_URL=http://localhost:3000
+# Static admin token for /admin routes
+ADMIN_SECRET=change-me-admin-secret
+
+# App base URL
+NEXT_PUBLIC_APP_URL=https://feedback.example.com
 ```
 
 ### Database Migrations
 
 ```bash
-psql $DATABASE_URL -f migrations/001_initial.sql
-psql $DATABASE_URL -f migrations/002_add_status.sql
+psql $DATABASE_URL -f migrations/20260407000000_feedback_annotations.sql
 ```
 
 ---
