@@ -1,7 +1,14 @@
 /**
  * Feedback Widget — embeddable standalone script
  *
- * Usage:
+ * Usage (API key — recommended for multi-tenant/SaaS):
+ *   <script
+ *     src="https://your-app.com/widget.js"
+ *     data-api-key="wfk_..."
+ *     data-api="https://your-app.com"
+ *   ></script>
+ *
+ * Usage (legacy pre-minted token):
  *   <script
  *     src="https://your-app.com/widget.js"
  *     data-token="YOUR_PREVIEW_TOKEN"
@@ -10,7 +17,6 @@
  *
  * Optional attributes:
  *   data-api      Base URL of the feedback API (defaults to same origin as the script)
- *   data-project  Project slug override (normally derived from the token)
  *   data-session  Session ID override (auto-generated if absent)
  */
 (function () {
@@ -20,11 +26,14 @@
   var currentScript =
     document.currentScript ||
     (function () {
-      var scripts = document.querySelectorAll("script[data-token]");
+      var scripts = document.querySelectorAll(
+        "script[data-token],script[data-api-key]"
+      );
       return scripts[scripts.length - 1];
     })();
 
   var TOKEN = (currentScript && currentScript.dataset.token) || "";
+  var API_KEY = (currentScript && currentScript.dataset.apiKey) || "";
   var API_BASE = ((currentScript && currentScript.dataset.api) || "").replace(
     /\/$/,
     ""
@@ -33,9 +42,25 @@
     (currentScript && currentScript.dataset.session) ||
     "s-" + Math.random().toString(36).slice(2);
 
-  if (!TOKEN) {
-    console.warn("[FeedbackWidget] Missing data-token attribute.");
+  if (!TOKEN && !API_KEY) {
+    console.warn("[FeedbackWidget] Missing data-token or data-api-key attribute.");
     return;
+  }
+
+  // ── Token exchange (API key → preview token) ─────────────────────────────────
+  function fetchToken() {
+    return fetch(API_BASE + "/api/widget/token", {
+      method: "POST",
+      headers: { "x-api-key": API_KEY },
+    })
+      .then(function (res) {
+        if (!res.ok) throw new Error("Token exchange failed: " + res.status);
+        return res.json();
+      })
+      .then(function (data) {
+        TOKEN = data.token;
+        SESSION_ID = data.session_id || SESSION_ID;
+      });
   }
 
   // ── State ───────────────────────────────────────────────────────────────────
@@ -398,12 +423,24 @@
     createToolbar();
   }
 
+  function start() {
+    if (API_KEY && !TOKEN) {
+      fetchToken()
+        .then(init)
+        .catch(function (err) {
+          console.warn("[FeedbackWidget] API key token exchange failed:", err);
+        });
+    } else {
+      init();
+    }
+  }
+
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
+    document.addEventListener("DOMContentLoaded", start);
   } else {
-    init();
+    start();
   }
 
   // Public API (optional programmatic control)
-  window.FeedbackWidget = { init: init };
+  window.FeedbackWidget = { init: start };
 })();

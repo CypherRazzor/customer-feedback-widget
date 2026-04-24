@@ -12,7 +12,6 @@ import {
   BarChart,
   Bar,
   Cell,
-  Legend,
 } from "recharts";
 
 interface TimePoint {
@@ -31,6 +30,10 @@ interface AnalyticsData {
   period: number;
 }
 
+interface FeedbackChartsProps {
+  projectSlug?: string;
+}
+
 const STATUS_COLORS: Record<string, string> = {
   Offen: "#f59e0b",
   Bestätigt: "#3b82f6",
@@ -45,7 +48,7 @@ function formatDate(dateStr: string, period: number): string {
   return d.toLocaleDateString("de-DE", { day: "numeric", month: "short" });
 }
 
-export function FeedbackCharts() {
+export function FeedbackCharts({ projectSlug }: FeedbackChartsProps) {
   const [period, setPeriod] = useState<7 | 30>(30);
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -55,7 +58,9 @@ export function FeedbackCharts() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/feedback/analytics?days=${p}`, {
+      const params = new URLSearchParams({ days: String(p) });
+      if (projectSlug) params.set("project_slug", projectSlug);
+      const res = await fetch(`/api/feedback/analytics?${params}`, {
         credentials: "include",
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -66,11 +71,11 @@ export function FeedbackCharts() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [projectSlug]);
 
   useEffect(() => {
     fetchData(period);
-  }, [period, fetchData]);
+  }, [period, projectSlug, fetchData]);
 
   const chartData = data?.timeSeries.map((p) => ({
     ...p,
@@ -83,7 +88,14 @@ export function FeedbackCharts() {
       aria-label="Feedback-Analytics"
     >
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-        <h2 className="text-base font-semibold text-gray-800">Trend-Analyse</h2>
+        <h2 className="text-base font-semibold text-gray-800">
+          Trend-Analyse
+          {projectSlug && (
+            <span className="ml-2 text-sm font-normal text-gray-400 font-mono">
+              ({projectSlug})
+            </span>
+          )}
+        </h2>
         <div className="flex gap-2" role="group" aria-label="Zeitraum auswählen">
           {([7, 30] as const).map((p) => (
             <button

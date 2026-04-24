@@ -18,9 +18,15 @@ interface GroupedFeedback {
   items: FeedbackRow[];
 }
 
-async function loadFeedback(): Promise<GroupedFeedback[]> {
+async function loadFeedback(projectSlug?: string): Promise<GroupedFeedback[]> {
+  const params: string[] = [];
+  const where = projectSlug
+    ? `WHERE project_slug = $${params.push(projectSlug)}`
+    : "";
+
   const { rows } = await pool.query<FeedbackRow>(
-    `SELECT * FROM feedback_annotations ORDER BY project_slug, created_at DESC`
+    `SELECT * FROM feedback_annotations ${where} ORDER BY project_slug, created_at DESC`,
+    params
   );
 
   const groups = new Map<string, FeedbackRow[]>();
@@ -55,8 +61,8 @@ function StatusBadge({ row }: { row: FeedbackRow }) {
   );
 }
 
-export async function FeedbackDashboard() {
-  const groups = await loadFeedback();
+export async function FeedbackDashboard({ projectSlug }: { projectSlug?: string } = {}) {
+  const groups = await loadFeedback(projectSlug);
 
   if (groups.length === 0) {
     return (

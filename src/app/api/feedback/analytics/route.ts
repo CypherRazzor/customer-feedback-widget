@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { timingSafeEqual } from "crypto";
 import { pool } from "@/lib/db";
+import { isAdminAuthorized } from "@/lib/admin-auth";
 
 // ── GET /api/feedback/analytics ── Admin auth ─────────────────────────────────
 export async function GET(req: NextRequest) {
@@ -10,28 +10,31 @@ export async function GET(req: NextRequest) {
 
   const days = parseInt(req.nextUrl.searchParams.get("days") ?? "30", 10);
   const period = [7, 30].includes(days) ? days : 30;
+  const slug = req.nextUrl.searchParams.get("project_slug") ?? null;
 
   const [timeSeries, statusBreakdown] = await Promise.all([
-    fetchTimeSeries(period),
-    fetchStatusBreakdown(period),
+    fetchTimeSeries(period, slug),
+    fetchStatusBreakdown(period, slug),
   ]);
 
-  return NextResponse.json({ timeSeries, statusBreakdown, period });
+  return NextResponse.json({ timeSeries, statusBreakdown, period, project_slug: slug });
 }
 
-async function fetchTimeSeries(days: number) {
+async function fetchTimeSeries(days: number, slug: string | null) {
+  const params: (number | string)[] = [days];
+  const slugFilter = slug ? `AND project_slug = $${params.push(slug)}` : "";
+
   const { rows } = await pool.query<{ date: string; count: string }>(
     `SELECT
        TO_CHAR(DATE_TRUNC('day', created_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD') AS date,
        COUNT(*)::text AS count
      FROM feedback_annotations
-     WHERE created_at >= NOW() - ($1 * INTERVAL '1 day')
+     WHERE created_at >= NOW() - ($1 * INTERVAL '1 day') ${slugFilter}
      GROUP BY DATE_TRUNC('day', created_at AT TIME ZONE 'UTC')
      ORDER BY DATE_TRUNC('day', created_at AT TIME ZONE 'UTC') ASC`,
-    [days]
+    params
   );
 
-  // Fill in missing days with 0
   const today = new Date();
   const filled: { date: string; count: number }[] = [];
   const dataMap = new Map(rows.map((r) => [r.date, parseInt(r.count, 10)]));
@@ -46,7 +49,10 @@ async function fetchTimeSeries(days: number) {
   return filled;
 }
 
-async function fetchStatusBreakdown(days: number) {
+async function fetchStatusBreakdown(days: number, slug: string | null) {
+  const params: (number | string)[] = [days];
+  const slugFilter = slug ? `AND project_slug = $${params.push(slug)}` : "";
+
   const { rows } = await pool.query<{ name: string; value: string }>(
     `SELECT
        CASE
@@ -56,33 +62,10 @@ async function fetchStatusBreakdown(days: number) {
        END AS name,
        COUNT(*)::text AS value
      FROM feedback_annotations
-     WHERE created_at >= NOW() - ($1 * INTERVAL '1 day')
+     WHERE created_at >= NOW() - ($1 * INTERVAL '1 day') ${slugFilter}
      GROUP BY 1`,
-    [days]
+    params
   );
 
   return rows.map((r) => ({ name: r.name, value: parseInt(r.value, 10) }));
-}
-
-function isAdminAuthorized(req: NextRequest): boolean {
-  const adminSecret = process.env.ADMIN_SECRET;
-  if (!adminSecret) return false;
-
-  // Accept Bearer token (for direct API access)
-  const auth = req.headers.get("authorization");
-  if (auth === `Bearer ${adminSecret}`) return true;
-
-  // Accept httpOnly session cookie (for browser requests from the admin UI)
-  const session = req.cookies.get("admin_session")?.value ?? "";
-  try {
-    const sessionBuf = Buffer.from(session);
-    const secretBuf = Buffer.from(adminSecret);
-    return (
-      session.length > 0 &&
-      sessionBuf.length === secretBuf.length &&
-      timingSafeEqual(sessionBuf, secretBuf)
-    );
-  } catch {
-    return false;
-  }
 }
