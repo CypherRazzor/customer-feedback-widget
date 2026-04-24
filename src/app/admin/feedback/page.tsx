@@ -1,26 +1,13 @@
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { timingSafeEqual } from "crypto";
 import { Suspense } from "react";
 import { FeedbackDashboard } from "@/modules/feedback/admin/FeedbackDashboard";
 import { FeedbackCharts } from "@/modules/feedback/admin/FeedbackCharts";
 import { TenantFilter } from "@/modules/feedback/admin/TenantFilter";
 import { pool } from "@/lib/db";
+import { isAdminAuthorizedServer } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
-function isAdminAuthenticated(): boolean {
-  const adminSecret = process.env.ADMIN_SECRET;
-  if (!adminSecret) return false;
-  const cookieStore = cookies();
-  const sessionCookie = cookieStore.get("admin_session")?.value ?? "";
-  try {
-    return timingSafeEqual(Buffer.from(sessionCookie), Buffer.from(adminSecret));
-  } catch {
-    return false;
-  }
-}
 
 async function fetchProjectSlugs(): Promise<string[]> {
   const { rows } = await pool.query<{ project_slug: string }>(
@@ -34,7 +21,7 @@ interface PageProps {
 }
 
 export default async function AdminFeedbackPage({ searchParams }: PageProps) {
-  if (!isAdminAuthenticated()) {
+  if (!isAdminAuthorizedServer()) {
     redirect("/admin/login");
   }
 

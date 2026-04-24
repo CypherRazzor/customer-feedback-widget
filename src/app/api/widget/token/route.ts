@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { verifyApiKey } from "@/lib/api-key";
 import { createPreviewToken } from "@/lib/preview-token";
+import { rateLimit } from "@/lib/rate-limit";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -17,6 +18,14 @@ export function OPTIONS() {
 // Exchanges a project API key for a short-lived preview token.
 // The widget calls this on init when data-api-key is provided instead of data-token.
 export async function POST(req: NextRequest) {
+  const ip = req.headers.get("x-forwarded-for") ?? "unknown";
+  if (!rateLimit(`widget-token:${ip}`, 30)) {
+    return NextResponse.json(
+      { error: "Too Many Requests" },
+      { status: 429, headers: CORS_HEADERS }
+    );
+  }
+
   const apiKey = req.headers.get("x-api-key");
   if (!apiKey) {
     return NextResponse.json(

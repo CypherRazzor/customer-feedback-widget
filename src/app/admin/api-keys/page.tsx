@@ -69,7 +69,12 @@ export default function ApiKeysPage() {
 
   async function handleRevoke(id: string) {
     if (!confirm("API-Key wirklich widerrufen?")) return;
-    await fetch(`/api/admin/api-keys?id=${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/admin/api-keys?id=${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError((data as { error?: string }).error ?? "Widerrufen fehlgeschlagen.");
+      return;
+    }
     loadKeys();
   }
 

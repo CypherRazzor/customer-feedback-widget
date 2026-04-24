@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { generateApiKey, hashApiKey } from "@/lib/api-key";
 import { isAdminAuthorized } from "@/lib/admin-auth";
+import { rateLimit } from "@/lib/rate-limit";
+
+const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,98}[a-z0-9]$/;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // ── GET /api/admin/api-keys ────────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
@@ -20,6 +24,11 @@ export async function GET(req: NextRequest) {
 // ── POST /api/admin/api-keys ───────────────────────────────────────────────────
 // Creates a new API key. Returns the raw key exactly once.
 export async function POST(req: NextRequest) {
+  const ip = req.headers.get("x-forwarded-for") ?? "unknown";
+  if (!rateLimit(`admin-api-keys:${ip}`, 10)) {
+    return NextResponse.json({ error: "Too Many Requests" }, { status: 429 });
+  }
+
   if (!isAdminAuthorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -35,6 +44,20 @@ export async function POST(req: NextRequest) {
   if (!project_slug || !project_name) {
     return NextResponse.json(
       { error: "project_slug and project_name are required" },
+      { status: 400 }
+    );
+  }
+
+  if (!SLUG_RE.test(project_slug)) {
+    return NextResponse.json(
+      { error: "project_slug must match ^[a-z0-9][a-z0-9-]{0,98}[a-z0-9]$" },
+      { status: 400 }
+    );
+  }
+
+  if (project_name.length > 200) {
+    return NextResponse.json(
+      { error: "project_name must be 200 characters or fewer" },
       { status: 400 }
     );
   }
@@ -60,8 +83,8 @@ export async function DELETE(req: NextRequest) {
   }
 
   const id = req.nextUrl.searchParams.get("id");
-  if (!id) {
-    return NextResponse.json({ error: "id query param required" }, { status: 400 });
+  if (!id || !UUID_RE.test(id)) {
+    return NextResponse.json({ error: "Valid UUID id query param required" }, { status: 400 });
   }
 
   const { rowCount } = await pool.query(
