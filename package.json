@@ -1,7 +1,38 @@
 {
   "name": "customer-feedback-widget",
-  "version": "0.1.0",
-  "private": true,
+  "version": "1.0.0",
+  "description": "Embeddable customer feedback widget — click any element to annotate it with a comment and automatic screenshot. Includes a Next.js backend and admin dashboard.",
+  "keywords": [
+    "feedback",
+    "widget",
+    "customer-feedback",
+    "bug-reporting",
+    "screenshot",
+    "annotation",
+    "embed",
+    "nextjs"
+  ],
+  "homepage": "https://github.com/CypherRazzor/customer-feedback-widget#readme",
+  "bugs": {
+    "url": "https://github.com/CypherRazzor/customer-feedback-widget/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/CypherRazzor/customer-feedback-widget.git"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "public/widget.js",
+    "src",
+    "migrations",
+    "next.config.mjs",
+    "tailwind.config.ts",
+    "postcss.config.js",
+    "tsconfig.json"
+  ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",
