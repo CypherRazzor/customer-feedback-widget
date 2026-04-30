@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { verifyPreviewToken } from "@/lib/preview-token";
 import { uploadScreenshot } from "@/lib/storage";
+import { isAdminAuthorized } from "@/lib/admin-auth";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -117,9 +118,3 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(rows);
 }
 
-function isAdminAuthorized(req: NextRequest): boolean {
-  const adminSecret = process.env.ADMIN_SECRET;
-  if (!adminSecret) return false;
-  const auth = req.headers.get("authorization");
-  return auth === `Bearer ${adminSecret}`;
-}

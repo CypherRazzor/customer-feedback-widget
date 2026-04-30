@@ -18,7 +18,7 @@ export function OPTIONS() {
 // Exchanges a project API key for a short-lived preview token.
 // The widget calls this on init when data-api-key is provided instead of data-token.
 export async function POST(req: NextRequest) {
-  const ip = req.headers.get("x-forwarded-for") ?? "unknown";
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   if (!rateLimit(`widget-token:${ip}`, 30)) {
     return NextResponse.json(
       { error: "Too Many Requests" },

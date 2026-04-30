@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
 // ── POST /api/admin/api-keys ───────────────────────────────────────────────────
 // Creates a new API key. Returns the raw key exactly once.
 export async function POST(req: NextRequest) {
-  const ip = req.headers.get("x-forwarded-for") ?? "unknown";
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   if (!rateLimit(`admin-api-keys:${ip}`, 10)) {
     return NextResponse.json({ error: "Too Many Requests" }, { status: 429 });
   }
