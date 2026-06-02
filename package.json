@@ -26,6 +26,7 @@
   },
   "files": [
     "public/widget.js",
+    "middleware.ts",
     "src",
     "migrations",
     "next.config.mjs",
@@ -50,7 +51,7 @@
     "css-selector-generator": "^3.9.1",
     "html2canvas": "^1.4.1",
     "lucide-react": "^0.400.0",
-    "next": "^14.2.35",
+    "next": ">=14.2.35 <15",
     "pg": "^8.12.0",
     "react": "^18",
     "react-dom": "^18",
