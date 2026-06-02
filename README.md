@@ -4,48 +4,221 @@ An embeddable feedback widget that lets customers click on any element of a web 
 
 ---
 
-## Quick Start (CDN)
+## Quick Start (CDN — 2 minutes)
 
-Add one `<script>` tag to your HTML — no build step required:
+Add one `<script>` tag to your HTML before `</body>` — no build step, no dependencies:
 
 ```html
 <script
   src="https://your-app.com/widget.js"
-  data-token="YOUR_PROJECT_TOKEN"
+  data-token="YOUR_PREVIEW_TOKEN"
 ></script>
 ```
 
-Replace `https://your-app.com` with the URL where this Next.js app is hosted, and `YOUR_PROJECT_TOKEN` with the preview token from the admin dashboard.
+Replace `https://your-app.com` with the URL where this Next.js app is hosted and `YOUR_PREVIEW_TOKEN` with the preview token from your admin dashboard (`/admin`).
+
+That's it. A **"Feedback geben"** button appears in the bottom-right corner of the page.
 
 ---
 
-## Live Demo
+## Script Attributes (Configuration)
 
-Start the dev server and open `/demo` to see the widget in action without a token:
+| Attribute      | Required | Default | Description |
+|----------------|----------|---------|-------------|
+| `data-token`   | Yes*     | —       | Preview token from the admin dashboard. Authenticates submissions. |
+| `data-api`     | No       | Same origin as `widget.js` | Base URL of the feedback API. Set this when the script is served from a CDN but the API lives on a different domain (e.g. `data-api="https://feedback.example.com"`). |
+| `data-session` | No       | Auto-generated `s-<random>` | Custom session ID. Use this to group feedback from the same reviewer across multiple page loads. If omitted, a random session is created per page load. |
+| `data-demo`    | No       | `"false"` | Set to `"true"` to enable demo mode — the widget renders and accepts input but makes **no API calls**. Useful for screenshots, onboarding, and local development without a token. |
+
+\* `data-token` is not required when `data-demo="true"`.
+
+---
+
+## Integration Examples
+
+### Vanilla JS / Plain HTML
+
+Complete, copy-paste ready example for any HTML page:
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>My App</title>
+</head>
+<body>
+
+  <h1>Welcome to My App</h1>
+  <p>Click the feedback button to leave a comment on any element.</p>
+
+  <!-- Feedback Widget — add just before </body> -->
+  <script
+    src="https://your-app.com/widget.js"
+    data-token="YOUR_PREVIEW_TOKEN"
+  ></script>
+
+</body>
+</html>
+```
+
+**With a custom session ID** (to group feedback from the same reviewer):
+
+```html
+<script
+  src="https://your-app.com/widget.js"
+  data-token="YOUR_PREVIEW_TOKEN"
+  data-session="reviewer-jane-2024"
+></script>
+```
+
+**When widget.js is on a CDN** and your API is on a different domain:
+
+```html
+<script
+  src="https://cdn.example.com/widget.js"
+  data-token="YOUR_PREVIEW_TOKEN"
+  data-api="https://feedback.example.com"
+></script>
+```
+
+---
+
+### React
+
+Install into any React app without any package install — just load the script once on mount.
+
+**Option A — `useEffect` hook (recommended for SPAs)**
+
+```jsx
+// components/FeedbackWidget.jsx
+import { useEffect } from 'react';
+
+export function FeedbackWidget({ token }) {
+  useEffect(() => {
+    // Don't load twice
+    if (document.querySelector('script[data-feedback-widget]')) {
+      window.FeedbackWidget?.init();
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://your-app.com/widget.js';
+    script.setAttribute('data-token', token);
+    script.setAttribute('data-feedback-widget', '');
+    document.body.appendChild(script);
+
+    return () => {
+      // Widget cleans up its own DOM — no teardown needed
+    };
+  }, [token]);
+
+  return null; // Widget renders its own UI into document.body
+}
+```
+
+Add it to your root layout:
+
+```jsx
+// app/layout.jsx (Next.js App Router)
+import { FeedbackWidget } from '@/components/FeedbackWidget';
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>
+        {children}
+        <FeedbackWidget token={process.env.NEXT_PUBLIC_FEEDBACK_TOKEN} />
+      </body>
+    </html>
+  );
+}
+```
+
+Set the token in `.env.local`:
+
+```env
+NEXT_PUBLIC_FEEDBACK_TOKEN=your_preview_token_here
+```
+
+**Option B — Next.js `Script` component (simpler, no lifecycle management)**
+
+```jsx
+// app/layout.jsx
+import Script from 'next/script';
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>
+        {children}
+        <Script
+          src="https://your-app.com/widget.js"
+          data-token={process.env.NEXT_PUBLIC_FEEDBACK_TOKEN}
+          strategy="afterInteractive"
+        />
+      </body>
+    </html>
+  );
+}
+```
+
+**Handling SPA route changes**
+
+The widget auto-initializes once on page load. For single-page apps, the widget stays active across route changes — no re-initialization needed. If you programmatically remove and re-add the widget component, call:
+
+```js
+window.FeedbackWidget?.init();
+```
+
+---
+
+## Widget JavaScript API
+
+The widget exposes a minimal global object for programmatic control:
+
+```js
+// Re-initialize the widget (e.g. after a dynamic script inject or SPA mount)
+window.FeedbackWidget.init();
+```
+
+The widget is fully self-contained: it injects its own styles and DOM elements into `document.body`. No global CSS or HTML scaffolding is required.
+
+---
+
+## Live Demo (no token required)
+
+Start the dev server and open `/demo` to see the widget in action in demo mode:
 
 ```bash
 npm run dev
 # open http://localhost:3000/demo
 ```
 
+Or embed it anywhere with `data-demo="true"`:
+
+```html
+<script
+  src="https://your-app.com/widget.js"
+  data-demo="true"
+></script>
+```
+
 ---
 
-## Script Attributes
+## Admin Dashboard
 
-| Attribute      | Required | Description |
-|----------------|----------|-------------|
-| `data-token`   | Yes*     | Preview token from the admin dashboard. |
-| `data-api`     | No       | Base URL of the feedback API. Defaults to the same origin as the script. Use this when the script is hosted on a CDN but the API is on a different domain. |
-| `data-session` | No       | Custom session ID. Auto-generated if omitted. Use to group feedback from the same reviewer across multiple page loads. |
-| `data-demo`    | No       | Set to `"true"` to enable demo mode — the widget renders fully but no API calls are made. Useful for screenshots, onboarding flows, or local development. |
+Access the admin at `/admin`. Log in with your credentials. The dashboard shows all feedback submissions with:
 
-\* `data-token` is not required when `data-demo="true"`.
+- Status (`open` / `in_review` / `done`)
+- Element selector and page URL
+- Screenshot preview
+- Comment text
+- Session grouping
 
 ---
 
 ## Self-Hosting
-
-The widget script is a static file served from the Next.js `public/` directory. No additional CDN setup is needed — the Next.js server sets `Access-Control-Allow-Origin: *` so the script can be embedded on any domain.
 
 ### Environment variables
 
@@ -72,7 +245,6 @@ BETTER_AUTH_URL=http://localhost:3000
 ### Database migrations
 
 ```bash
-# Apply all pending migrations
 psql $DATABASE_URL -f migrations/001_initial.sql
 psql $DATABASE_URL -f migrations/002_add_status.sql
 ```
@@ -81,31 +253,21 @@ psql $DATABASE_URL -f migrations/002_add_status.sql
 
 ```bash
 npm install
-npm run dev     # development
+npm run dev          # development
 npm run build && npm start  # production
 ```
 
----
-
-## Admin Dashboard
-
-Access the admin at `/admin`. Log in with the credentials configured via the auth setup. The dashboard shows all feedback submissions with:
-
-- Status (`open` / `in_review` / `done`)
-- Element selector and page URL
-- Screenshot preview
-- Comment text
-- Session grouping
+The Next.js server sets `Access-Control-Allow-Origin: *` on `widget.js` so it can be embedded on any domain.
 
 ---
 
-## API Reference
+## API Reference (Server)
 
-### POST `/api/feedback`
+### `POST /api/feedback`
 
 Submit a feedback annotation.
 
-**Headers:** `x-preview-token: <token>`
+**Header:** `x-preview-token: <token>`
 
 ```json
 {
@@ -117,37 +279,34 @@ Submit a feedback annotation.
 }
 ```
 
-### POST `/api/feedback/confirm`
+**Response:** `200 OK` on success, `401` for invalid token, `400` for missing fields.
 
-Confirm (close) a feedback session.
+---
 
-**Headers:** `x-preview-token: <token>`
+### `POST /api/feedback/confirm`
+
+Close a feedback session (triggered when the reviewer clicks "Feedback abschließen").
+
+**Header:** `x-preview-token: <token>`
 
 ```json
 { "session_id": "s-abc123" }
 ```
 
-### PATCH `/api/feedback/[id]`
+---
 
-Update feedback status or assignee (admin only, requires session cookie).
+### `PATCH /api/feedback/[id]`
+
+Update feedback status or assignee. Requires an authenticated admin session cookie.
 
 ```json
 { "status": "in_review", "assigneeId": "user-uuid" }
 ```
 
----
-
-## Widget JavaScript API
-
-The widget exposes a minimal global API for programmatic control:
-
-```js
-// Re-initialize the widget (e.g. after a SPA route change)
-window.FeedbackWidget.init();
-```
+**Status values:** `open` | `in_review` | `done`
 
 ---
 
 ## Browser Compatibility
 
-The widget is plain ES5 with no external dependencies at runtime. `html2canvas` is loaded on-demand from jsDelivr for screenshots. Supports all modern browsers (Chrome, Firefox, Safari, Edge).
+The widget is plain ES5 with no external runtime dependencies. `html2canvas` is loaded on-demand from jsDelivr only when a user takes a screenshot. Supports all modern browsers (Chrome, Firefox, Safari, Edge).
