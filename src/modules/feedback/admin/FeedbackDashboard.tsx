@@ -1,4 +1,5 @@
 import { pool } from "@/lib/db";
+import { ResolveButton } from "./ResolveButton";
 
 interface FeedbackRow {
   id: string;
@@ -89,11 +90,7 @@ export async function FeedbackDashboard() {
                       {new Date(item.created_at).toLocaleString("de-DE")}
                     </span>
                   </div>
-                  {!item.resolved_at && (
-                    <form action={`/api/feedback/${item.id}`} method="PATCH">
-                      <ResolveButton id={item.id} />
-                    </form>
-                  )}
+                  {!item.resolved_at && <ResolveButton id={item.id} />}
                 </div>
 
                 <p className="text-sm text-gray-800 mb-2">{item.comment}</p>
@@ -131,15 +128,3 @@ export async function FeedbackDashboard() {
   );
 }
 
-// Client component for resolve action
-function ResolveButton({ id }: { id: string }) {
-  return (
-    <button
-      type="submit"
-      className="text-xs text-gray-500 hover:text-green-700 border border-gray-200 rounded px-2 py-1 transition-colors"
-      formAction={`/api/feedback/${id}`}
-    >
-      Als erledigt markieren
-    </button>
-  );
-}

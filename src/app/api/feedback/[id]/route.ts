@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 import { pool } from "@/lib/db";
 
 // ── PATCH /api/feedback/:id ── Admin: mark as resolved ────────────────────────
@@ -39,6 +40,22 @@ export async function PATCH(
 function isAdminAuthorized(req: NextRequest): boolean {
   const adminSecret = process.env.ADMIN_SECRET;
   if (!adminSecret) return false;
+
+  // Accept Bearer token (for direct API access)
   const auth = req.headers.get("authorization");
-  return auth === `Bearer ${adminSecret}`;
+  if (auth === `Bearer ${adminSecret}`) return true;
+
+  // Accept httpOnly session cookie (for browser requests from the admin UI)
+  const session = req.cookies.get("admin_session")?.value ?? "";
+  try {
+    const sessionBuf = Buffer.from(session);
+    const secretBuf = Buffer.from(adminSecret);
+    return (
+      session.length > 0 &&
+      sessionBuf.length === secretBuf.length &&
+      timingSafeEqual(sessionBuf, secretBuf)
+    );
+  } catch {
+    return false;
+  }
 }

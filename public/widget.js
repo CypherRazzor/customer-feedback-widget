@@ -32,8 +32,9 @@
   var SESSION_ID =
     (currentScript && currentScript.dataset.session) ||
     "s-" + Math.random().toString(36).slice(2);
+  var DEMO_MODE = (currentScript && currentScript.dataset.demo === "true") || false;
 
-  if (!TOKEN) {
+  if (!TOKEN && !DEMO_MODE) {
     console.warn("[FeedbackWidget] Missing data-token attribute.");
     return;
   }
@@ -305,6 +306,13 @@
       submitBtn.textContent = "Wird gesendet\u2026";
       errEl.style.display = "none";
 
+      if (DEMO_MODE) {
+        feedbackCount++;
+        closeForm();
+        renderToolbar();
+        return;
+      }
+
       fetch(API_BASE + "/api/feedback", {
         method: "POST",
         headers: {
@@ -369,14 +377,16 @@
 
   // ── Confirm session ──────────────────────────────────────────────────────────
   function confirmSession() {
-    fetch(API_BASE + "/api/feedback/confirm", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-preview-token": TOKEN,
-      },
-      body: JSON.stringify({ session_id: SESSION_ID }),
-    }).catch(function () {});
+    if (!DEMO_MODE) {
+      fetch(API_BASE + "/api/feedback/confirm", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-preview-token": TOKEN,
+        },
+        body: JSON.stringify({ session_id: SESSION_ID }),
+      }).catch(function () {});
+    }
 
     if (toolbarEl) {
       toolbarEl.remove();
