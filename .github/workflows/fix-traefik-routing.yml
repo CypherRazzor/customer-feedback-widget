@@ -11,7 +11,8 @@ on:
 
 jobs:
   fix-traefik:
-    runs-on: ubuntu-latest
+    # Must run on self-hosted eadu runner — Coolify API blocks GitHub-hosted Azure IPs
+    runs-on: [self-hosted, eadu]
     permissions:
       contents: read
     env:
