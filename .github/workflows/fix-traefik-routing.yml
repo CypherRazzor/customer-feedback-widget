@@ -20,11 +20,29 @@ jobs:
       COOLIFY_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
 
     steps:
+      - name: Debug — probe Coolify API reachability
+        id: probe
+        run: |
+          echo "=== Probing Coolify API reachability ==="
+          echo "URL length: ${#COOLIFY_URL}"
+          echo "Token length: ${#COOLIFY_TOKEN}"
+          echo "App UUID length: ${#APP_UUID}"
+
+          # Test basic connectivity (verbose curl, no auth, no path)
+          echo "--- DNS + TCP connect test ---"
+          curl -sSv --connect-timeout 10 --max-time 15 \
+            "${COOLIFY_URL}/api/v1/healthcheck" 2>&1 | grep -E "^[*<>]|error|refused|timeout|HTTP" | head -30 || true
+
+          echo "--- Raw error details ---"
+          curl -sSv --connect-timeout 10 --max-time 15 \
+            -H "Authorization: Bearer $COOLIFY_TOKEN" \
+            "${COOLIFY_URL}/api/v1/applications/$APP_UUID" 2>&1 | tail -20 || true
+
       - name: Query current application state
         id: query_app
         run: |
           echo "=== Querying Coolify app state ==="
-          RESPONSE=$(curl -sf \
+          RESPONSE=$(curl -sSf --connect-timeout 15 --max-time 30 \
             -H "Authorization: Bearer $COOLIFY_TOKEN" \
             -H "Content-Type: application/json" \
             "$COOLIFY_URL/api/v1/applications/$APP_UUID" 2>&1) || {
