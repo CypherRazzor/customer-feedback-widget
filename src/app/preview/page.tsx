@@ -14,7 +14,7 @@ const FeedbackWidget = dynamic(
 );
 
 interface Props {
-  searchParams: { token?: string };
+  searchParams: Promise<{ token?: string }>;
 }
 
 function hasStaticPreview(slug: string): boolean {
@@ -28,8 +28,8 @@ function hasStaticPreview(slug: string): boolean {
   return existsSync(previewPath);
 }
 
-export default function PreviewPage({ searchParams }: Props) {
-  const { token } = searchParams;
+export default async function PreviewPage({ searchParams }: Props) {
+  const { token } = await searchParams;
 
   if (!token) {
     redirect("/");

@@ -5,13 +5,13 @@ import { pool } from "@/lib/db";
 // ── PATCH /api/feedback/:id ── Admin: mark as resolved ────────────────────────
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   if (!isAdminAuthorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { id } = params;
+  const { id } = await params;
 
   let body: { resolved_at?: string | null } = {};
   try {

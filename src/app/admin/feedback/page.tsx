@@ -17,15 +17,16 @@ async function fetchProjectSlugs(): Promise<string[]> {
 }
 
 interface PageProps {
-  searchParams: { project_slug?: string };
+  searchParams: Promise<{ project_slug?: string }>;
 }
 
 export default async function AdminFeedbackPage({ searchParams }: PageProps) {
-  if (!isAdminAuthorizedServer()) {
+  if (!(await isAdminAuthorizedServer())) {
     redirect("/admin/login");
   }
 
-  const projectSlug = searchParams.project_slug || undefined;
+  const { project_slug } = await searchParams;
+  const projectSlug = project_slug || undefined;
   const slugs = await fetchProjectSlugs();
 
   return (

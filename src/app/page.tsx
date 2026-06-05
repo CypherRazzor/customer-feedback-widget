@@ -1,13 +1,14 @@
 import { redirect } from "next/navigation";
 
 // Root redirects to preview page if token is present, else shows error
-export default function Home({
+export default async function Home({
   searchParams,
 }: {
-  searchParams: { token?: string; slug?: string };
+  searchParams: Promise<{ token?: string; slug?: string }>;
 }) {
-  if (searchParams.token && searchParams.slug) {
-    redirect(`/preview?token=${searchParams.token}&slug=${searchParams.slug}`);
+  const { token, slug } = await searchParams;
+  if (token && slug) {
+    redirect(`/preview?token=${token}&slug=${slug}`);
   }
 
   return (
