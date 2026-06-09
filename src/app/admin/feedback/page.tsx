@@ -30,7 +30,7 @@ export default async function AdminFeedbackPage({ searchParams }: PageProps) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+      <header className="sticky top-0 z-10 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
         <h1 className="text-lg font-semibold text-gray-800">Feedback Dashboard</h1>
         <div className="flex items-center gap-4">
           <a
@@ -42,7 +42,7 @@ export default async function AdminFeedbackPage({ searchParams }: PageProps) {
           <form action="/api/admin/logout" method="POST">
             <button
               type="submit"
-              className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+              className="text-sm text-gray-500 hover:text-gray-700 transition-colors focus:ring-2 focus:ring-blue-500 rounded"
             >
               Abmelden
             </button>
