@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 import { pool } from "@/lib/db";
 
 // ── PATCH /api/feedback/:id ── Admin: update status and/or assignee ───────────
@@ -79,22 +80,21 @@ function isAdminAuthorized(req: NextRequest): boolean {
   const adminSecret = process.env.ADMIN_SECRET;
   if (!adminSecret) return false;
 
-  // Accept Bearer token (server-to-server / curl)
+  // Accept Bearer token (for direct API access)
   const auth = req.headers.get("authorization");
   if (auth === `Bearer ${adminSecret}`) return true;
 
-  // Accept httpOnly admin_session cookie (browser same-origin requests)
+  // Accept httpOnly session cookie (for browser requests from the admin UI)
+  const session = req.cookies.get("admin_session")?.value ?? "";
   try {
-    const { timingSafeEqual } = require("crypto") as typeof import("crypto");
-    const sessionValue = req.cookies.get("admin_session")?.value ?? "";
-    if (sessionValue.length === adminSecret.length) {
-      return timingSafeEqual(
-        Buffer.from(sessionValue),
-        Buffer.from(adminSecret)
-      );
-    }
+    const sessionBuf = Buffer.from(session);
+    const secretBuf = Buffer.from(adminSecret);
+    return (
+      session.length > 0 &&
+      sessionBuf.length === secretBuf.length &&
+      timingSafeEqual(sessionBuf, secretBuf)
+    );
   } catch {
-    // buffer length mismatch or missing cookie
+    return false;
   }
-  return false;
 }

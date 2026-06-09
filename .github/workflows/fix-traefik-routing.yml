@@ -1,0 +1,177 @@
+name: Fix Traefik Routing — Connect CFW container to coolify network
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run — only query API, do not apply changes'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  fix-traefik:
+    # Use GitHub-hosted runner (eadu self-hosted is not registered on this repo)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      APP_UUID: ${{ secrets.CFW_STAGING_APP_UUID }}
+      COOLIFY_URL: ${{ secrets.COOLIFY_API_URL }}
+      COOLIFY_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+
+    steps:
+      - name: Debug — probe Coolify API reachability and token
+        id: probe
+        run: |
+          echo "=== Probing Coolify API reachability ==="
+          echo "URL length: ${#COOLIFY_URL}"
+          echo "Token length: ${#COOLIFY_TOKEN}"
+          echo "App UUID length: ${#APP_UUID}"
+          echo "Token prefix: ${COOLIFY_TOKEN:0:8}..."
+
+          echo "--- Healthcheck (no auth) ---"
+          curl -si --connect-timeout 10 --max-time 15 \
+            "${COOLIFY_URL}/api/v1/healthcheck" 2>&1 | head -20 || true
+
+          echo "--- App query (with auth) ---"
+          HTTP_CODE=$(curl -so /dev/null -w "%{http_code}" --connect-timeout 10 --max-time 15 \
+            -H "Authorization: Bearer $COOLIFY_TOKEN" \
+            "${COOLIFY_URL}/api/v1/applications/$APP_UUID" 2>&1) || HTTP_CODE="error"
+          echo "HTTP status: $HTTP_CODE"
+
+          echo "--- App query raw response ---"
+          curl -s --connect-timeout 10 --max-time 15 \
+            -H "Authorization: Bearer $COOLIFY_TOKEN" \
+            "${COOLIFY_URL}/api/v1/applications/$APP_UUID" 2>&1 | head -5 || true
+
+      - name: Query current application state
+        id: query_app
+        run: |
+          echo "=== Querying Coolify app state ==="
+          RESPONSE=$(curl -sSf --connect-timeout 15 --max-time 30 \
+            -H "Authorization: Bearer $COOLIFY_TOKEN" \
+            -H "Content-Type: application/json" \
+            "$COOLIFY_URL/api/v1/applications/$APP_UUID" 2>&1) || {
+            echo "::error::Failed to query Coolify API (HTTP 403 = token does not have API access enabled in Coolify UI)"
+            echo "Fix: Coolify UI → Profile → API Tokens → enable 'Allow API Access' on the token"
+            echo "Alt fix: Coolify UI → find app duahe1wymadv6xe2in3xh6vd → change Build Pack to Docker Compose → redeploy"
+            exit 1
+          }
+          echo "$RESPONSE" | python3 -m json.tool 2>/dev/null || echo "$RESPONSE"
+          BUILD_PACK=$(echo "$RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('build_pack','unknown'))" 2>/dev/null || echo "unknown")
+          STATUS=$(echo "$RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('status','unknown'))" 2>/dev/null || echo "unknown")
+          echo "build_pack=$BUILD_PACK" >> "$GITHUB_OUTPUT"
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+          echo "Current buildpack: $BUILD_PACK, status: $STATUS"
+
+      - name: Switch to dockercompose buildpack (if not already)
+        if: ${{ inputs.dry_run == 'false' && steps.query_app.outputs.build_pack != 'dockercompose' }}
+        id: update_buildpack
+        run: |
+          echo "=== Switching buildpack to dockercompose ==="
+          RESULT=$(curl -sf -X PATCH \
+            -H "Authorization: Bearer $COOLIFY_TOKEN" \
+            -H "Content-Type: application/json" \
+            "$COOLIFY_URL/api/v1/applications/$APP_UUID" \
+            -d '{"build_pack": "dockercompose", "docker_compose_location": "/docker-compose.yaml"}' 2>&1) || {
+            echo "PATCH buildpack failed: $RESULT"
+          }
+          echo "PATCH result: $RESULT"
+
+      - name: Try server execute endpoint (Coolify 4.x)
+        if: ${{ inputs.dry_run == 'false' }}
+        id: execute_cmd
+        run: |
+          echo "=== Trying server execute endpoint ==="
+          SERVERS=$(curl -sf \
+            -H "Authorization: Bearer $COOLIFY_TOKEN" \
+            "$COOLIFY_URL/api/v1/servers" 2>&1) || { echo "servers endpoint unavailable: $SERVERS"; SERVERS="[]"; }
+          echo "Servers response (first 300 chars): ${SERVERS:0:300}"
+
+          SERVER_UUID=$(echo "$SERVERS" | python3 -c "
+          import sys,json
+          try:
+            servers = json.load(sys.stdin)
+            # Find moncala-arm server
+            if isinstance(servers, list):
+              for s in servers:
+                name = s.get('name','').lower()
+                ip = s.get('ip','')
+                if 'moncala' in name or ip == '162.55.209.240':
+                  print(s.get('uuid',''))
+                  break
+              if servers:
+                print(servers[0].get('uuid',''))
+          except Exception as e:
+            import sys; print(f'parse error: {e}', file=sys.stderr)
+          " 2>/dev/null || echo "")
+
+          if [ -n "$SERVER_UUID" ]; then
+            echo "Found server UUID: $SERVER_UUID"
+            echo "=== Trying server execute endpoint ==="
+            EXEC_RESULT=$(curl -sf -X POST \
+              -H "Authorization: Bearer $COOLIFY_TOKEN" \
+              -H "Content-Type: application/json" \
+              "$COOLIFY_URL/api/v1/servers/$SERVER_UUID/execute" \
+              -d "{\"command\": \"docker network connect coolify \$(docker ps -qf 'name=$APP_UUID') && echo NETWORK_CONNECTED\"}" 2>&1) || true
+            echo "Execute result: $EXEC_RESULT"
+            if echo "$EXEC_RESULT" | grep -q "NETWORK_CONNECTED"; then
+              echo "network_connected=true" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "No server UUID found, skipping server execute"
+          fi
+
+      - name: Redeploy application with dockercompose buildpack
+        if: ${{ inputs.dry_run == 'false' }}
+        id: redeploy
+        run: |
+          echo "=== Triggering redeploy ==="
+          DEPLOY_RESULT=$(curl -sf -X GET \
+            -H "Authorization: Bearer $COOLIFY_TOKEN" \
+            "$COOLIFY_URL/api/v1/applications/$APP_UUID/deploy" 2>&1) || {
+            DEPLOY_RESULT=$(curl -sf -X POST \
+              -H "Authorization: Bearer $COOLIFY_TOKEN" \
+              -H "Content-Type: application/json" \
+              "$COOLIFY_URL/api/v1/applications/$APP_UUID/deploy" \
+              -d '{"force": true}' 2>&1) || echo "deploy trigger failed: $DEPLOY_RESULT"
+          }
+          echo "Deploy result: $DEPLOY_RESULT"
+
+      - name: Wait and verify health
+        if: ${{ inputs.dry_run == 'false' }}
+        run: |
+          echo "=== Waiting 90s for container to start, then checking health ==="
+          sleep 90
+
+          HEALTH_URL="https://$APP_UUID.moncala.digitalesgeschaeft.de/api/health"
+          echo "Checking: $HEALTH_URL"
+
+          for i in 1 2 3 4 5; do
+            STATUS=$(curl -sf -o /dev/null -w "%{http_code}" "$HEALTH_URL" 2>&1) || STATUS="error"
+            echo "Attempt $i: HTTP $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              echo "✅ Health check PASSED — Traefik routing is working!"
+              exit 0
+            fi
+            sleep 20
+          done
+
+          echo "❌ Health check FAILED — Traefik still returning $STATUS"
+          echo ""
+          echo "MANUAL FIX REQUIRED:"
+          echo "1. Log into Coolify at https://coruscant.digitalesgeschaeft.de"
+          echo "2. Find app: duahe1wymadv6xe2in3xh6vd"
+          echo "3. Change Build Pack to 'Docker Compose'"
+          echo "4. Redeploy"
+          exit 1
+
+      - name: Dry run — show current state
+        if: ${{ inputs.dry_run == 'true' }}
+        run: |
+          echo "=== DRY RUN ==="
+          echo "App UUID: $APP_UUID"
+          echo "Coolify URL: $COOLIFY_URL"
+          echo "Build pack: ${{ steps.query_app.outputs.build_pack }}"
+          echo "Status: ${{ steps.query_app.outputs.status }}"

@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid or expired token" }, { status: 401, headers: CORS_HEADERS });
   }
 
-  let body: { project_slug?: string; session_id?: string } = {};
+  let body: { project_slug?: string } = {};
   try {
     body = await req.json();
   } catch {
@@ -37,7 +37,10 @@ export async function POST(req: NextRequest) {
   }
 
   const project_slug = body.project_slug ?? verified.slug;
-  const session_id = body.session_id ?? verified.sessionId;
+  // Always use the UUID sessionId from the verified token — this is what the
+  // feedback POST route stores. The widget's "s-<random>" SESSION_ID is not a
+  // UUID and would never match the DB column (UUID NOT NULL).
+  const session_id = verified.sessionId;
 
   // Validate that token slug matches requested slug (prevent cross-project confirmation)
   if (project_slug !== verified.slug) {

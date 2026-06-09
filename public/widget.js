@@ -1,7 +1,14 @@
 /**
  * Feedback Widget — embeddable standalone script
  *
- * Usage:
+ * Usage (API key — recommended for multi-tenant/SaaS):
+ *   <script
+ *     src="https://your-app.com/widget.js"
+ *     data-api-key="wfk_..."
+ *     data-api="https://your-app.com"
+ *   ></script>
+ *
+ * Usage (legacy pre-minted token):
  *   <script
  *     src="https://your-app.com/widget.js"
  *     data-token="YOUR_PREVIEW_TOKEN"
@@ -10,8 +17,9 @@
  *
  * Optional attributes:
  *   data-api      Base URL of the feedback API (defaults to same origin as the script)
- *   data-project  Project slug override (normally derived from the token)
  *   data-session  Session ID override (auto-generated if absent)
+ *   data-demo     Set to "true" to render the widget without making any API calls.
+ *                 data-token / data-api-key are not required in demo mode.
  */
 (function () {
   "use strict";
@@ -20,11 +28,14 @@
   var currentScript =
     document.currentScript ||
     (function () {
-      var scripts = document.querySelectorAll("script[data-token]");
+      var scripts = document.querySelectorAll(
+        "script[data-token],script[data-api-key]"
+      );
       return scripts[scripts.length - 1];
     })();
 
   var TOKEN = (currentScript && currentScript.dataset.token) || "";
+  var API_KEY = (currentScript && currentScript.dataset.apiKey) || "";
   var API_BASE = ((currentScript && currentScript.dataset.api) || "").replace(
     /\/$/,
     ""
@@ -32,10 +43,27 @@
   var SESSION_ID =
     (currentScript && currentScript.dataset.session) ||
     "s-" + Math.random().toString(36).slice(2);
+  var DEMO_MODE = (currentScript && currentScript.dataset.demo === "true") || false;
 
-  if (!TOKEN) {
-    console.warn("[FeedbackWidget] Missing data-token attribute.");
+  if (!TOKEN && !API_KEY && !DEMO_MODE) {
+    console.warn("[FeedbackWidget] Missing data-token or data-api-key attribute.");
     return;
+  }
+
+  // ── Token exchange (API key → preview token) ─────────────────────────────────
+  function fetchToken() {
+    return fetch(API_BASE + "/api/widget/token", {
+      method: "POST",
+      headers: { "x-api-key": API_KEY },
+    })
+      .then(function (res) {
+        if (!res.ok) throw new Error("Token exchange failed: " + res.status);
+        return res.json();
+      })
+      .then(function (data) {
+        TOKEN = data.token;
+        SESSION_ID = data.session_id || SESSION_ID;
+      });
   }
 
   // ── State ───────────────────────────────────────────────────────────────────
@@ -305,6 +333,13 @@
       submitBtn.textContent = "Wird gesendet\u2026";
       errEl.style.display = "none";
 
+      if (DEMO_MODE) {
+        feedbackCount++;
+        closeForm();
+        renderToolbar();
+        return;
+      }
+
       fetch(API_BASE + "/api/feedback", {
         method: "POST",
         headers: {
@@ -369,14 +404,16 @@
 
   // ── Confirm session ──────────────────────────────────────────────────────────
   function confirmSession() {
-    fetch(API_BASE + "/api/feedback/confirm", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-preview-token": TOKEN,
-      },
-      body: JSON.stringify({ session_id: SESSION_ID }),
-    }).catch(function () {});
+    if (!DEMO_MODE) {
+      fetch(API_BASE + "/api/feedback/confirm", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-preview-token": TOKEN,
+        },
+        body: JSON.stringify({ session_id: SESSION_ID }),
+      }).catch(function () {});
+    }
 
     if (toolbarEl) {
       toolbarEl.remove();
@@ -398,12 +435,24 @@
     createToolbar();
   }
 
+  function start() {
+    if (API_KEY && !TOKEN) {
+      fetchToken()
+        .then(init)
+        .catch(function (err) {
+          console.warn("[FeedbackWidget] API key token exchange failed:", err);
+        });
+    } else {
+      init();
+    }
+  }
+
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
+    document.addEventListener("DOMContentLoaded", start);
   } else {
-    init();
+    start();
   }
 
   // Public API (optional programmatic control)
-  window.FeedbackWidget = { init: init };
+  window.FeedbackWidget = { init: start };
 })();
