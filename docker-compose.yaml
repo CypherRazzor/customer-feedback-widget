@@ -13,15 +13,8 @@ services:
       - PORT=3000
       - HOSTNAME=0.0.0.0
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.cfw-staging.rule=Host(`duahe1wymadv6xe2in3xh6vd.moncala.digitalesgeschaeft.de`)"
-      - "traefik.http.routers.cfw-staging.entrypoints=https"
-      - "traefik.http.routers.cfw-staging.tls=true"
-      - "traefik.http.routers.cfw-staging.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.cfw-staging-http.rule=Host(`duahe1wymadv6xe2in3xh6vd.moncala.digitalesgeschaeft.de`)"
-      - "traefik.http.routers.cfw-staging-http.entrypoints=http"
-      - "traefik.http.routers.cfw-staging-http.middlewares=redirect-to-https@docker"
-      - "traefik.http.services.cfw-staging.loadbalancer.server.port=3000"
+      caddy: duahe1wymadv6xe2in3xh6vd.moncala.digitalesgeschaeft.de
+      caddy.reverse_proxy: "{{upstreams 3000}}"
 
 networks:
   coolify:
