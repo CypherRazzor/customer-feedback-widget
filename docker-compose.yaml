@@ -1,8 +1,6 @@
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/cypherrazzor/customer-feedback-widget:staging
     restart: unless-stopped
     networks:
       - coolify
