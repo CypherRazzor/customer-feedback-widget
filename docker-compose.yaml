@@ -1,6 +1,6 @@
 services:
   app:
-    image: ghcr.io/cypherrazzor/customer-feedback-widget:staging
+    build: .
     restart: unless-stopped
     networks:
       - coolify
