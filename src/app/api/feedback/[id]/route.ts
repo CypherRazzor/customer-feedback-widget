@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { timingSafeEqual } from "crypto";
 import { pool } from "@/lib/db";
+import { isAdminAuthorized } from "@/lib/admin-auth";
 
 // ── PATCH /api/feedback/:id ── Admin: update status and/or assignee ───────────
 export async function PATCH(
@@ -74,27 +74,4 @@ export async function PATCH(
   }
 
   return NextResponse.json(rows[0]);
-}
-
-function isAdminAuthorized(req: NextRequest): boolean {
-  const adminSecret = process.env.ADMIN_SECRET;
-  if (!adminSecret) return false;
-
-  // Accept Bearer token (for direct API access)
-  const auth = req.headers.get("authorization");
-  if (auth === `Bearer ${adminSecret}`) return true;
-
-  // Accept httpOnly session cookie (for browser requests from the admin UI)
-  const session = req.cookies.get("admin_session")?.value ?? "";
-  try {
-    const sessionBuf = Buffer.from(session);
-    const secretBuf = Buffer.from(adminSecret);
-    return (
-      session.length > 0 &&
-      sessionBuf.length === secretBuf.length &&
-      timingSafeEqual(sessionBuf, secretBuf)
-    );
-  } catch {
-    return false;
-  }
 }
