@@ -12,7 +12,11 @@ export function ResolveButton({ id }: { id: string }) {
     setLoading(true);
     setError(false);
     try {
-      const res = await fetch(`/api/feedback/${id}`, { method: "PATCH" });
+      const res = await fetch(`/api/feedback/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "resolved" }),
+      });
       if (res.ok) {
         router.refresh();
       } else {
