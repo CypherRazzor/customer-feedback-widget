@@ -1,6 +1,7 @@
 services:
   app:
-    image: ttl.sh/cypherrazzor-cfw-staging:24h
+    build:
+      context: .
     restart: unless-stopped
     networks:
       - coolify
