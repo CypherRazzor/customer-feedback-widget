@@ -3,11 +3,12 @@ import { cookies, headers } from "next/headers";
 import type { NextRequest } from "next/server";
 
 // For use in Server Components (reads cookies/headers via next/headers).
-export function isAdminAuthorizedServer(): boolean {
+// Next.js 15: cookies() and headers() are async.
+export async function isAdminAuthorizedServer(): Promise<boolean> {
   const adminSecret = process.env.ADMIN_SECRET;
   if (!adminSecret) return false;
 
-  const auth = headers().get("authorization");
+  const auth = (await headers()).get("authorization");
   if (auth?.startsWith("Bearer ")) {
     const token = auth.slice(7);
     try {
@@ -21,7 +22,7 @@ export function isAdminAuthorizedServer(): boolean {
     }
   }
 
-  const session = cookies().get("admin_session")?.value ?? "";
+  const session = (await cookies()).get("admin_session")?.value ?? "";
   try {
     const sessionBuf = Buffer.from(session);
     const secretBuf = Buffer.from(adminSecret);

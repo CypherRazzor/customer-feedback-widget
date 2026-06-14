@@ -5,7 +5,7 @@ import { isAdminAuthorized } from "@/lib/admin-auth";
 // ── PATCH /api/feedback/:id ── Admin: update status and/or assignee ───────────
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   if (!isAdminAuthorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

@@ -1,20 +1,11 @@
 import { redirect } from "next/navigation";
 import { existsSync } from "fs";
 import path from "path";
-import dynamic from "next/dynamic";
 import { verifyPreviewToken } from "@/lib/preview-token";
-
-// Lazy-load the widget — only rendered client-side
-const FeedbackWidget = dynamic(
-  () =>
-    import("@/modules/feedback/components/FeedbackWidget").then(
-      (m) => m.FeedbackWidget
-    ),
-  { ssr: false }
-);
+import { FeedbackWidgetLoader } from "./FeedbackWidgetLoader";
 
 interface Props {
-  searchParams: { token?: string };
+  searchParams: Promise<{ token?: string }>;
 }
 
 function hasStaticPreview(slug: string): boolean {
@@ -28,8 +19,8 @@ function hasStaticPreview(slug: string): boolean {
   return existsSync(previewPath);
 }
 
-export default function PreviewPage({ searchParams }: Props) {
-  const { token } = searchParams;
+export default async function PreviewPage({ searchParams }: Props) {
+  const { token } = await searchParams;
 
   if (!token) {
     redirect("/");
@@ -102,7 +93,7 @@ export default function PreviewPage({ searchParams }: Props) {
       </div>
 
       {/* Feedback widget — floats above everything incl. iframe */}
-      <FeedbackWidget
+      <FeedbackWidgetLoader
         projectSlug={slug}
         sessionId={sessionId}
         token={token}
